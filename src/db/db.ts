@@ -58,8 +58,8 @@ class DatabaseService {
 
       const activeHotelId = hotelRow.id;
       const hotelRooms = this.db.prepare('SELECT room_type, room_name, min_rate, max_rate FROM hotel_rooms WHERE hotel_id = ?').all(activeHotelId) as HotelRoomType[];
-      const competitorHotels = this.db.prepare('SELECT competitor_hotel_search, competitor_hotel_id, competitor_hotel_name, address, city, review_score, url FROM competitor_hotels WHERE hotel_id = ?').all(activeHotelId) as CompetitorHotel[];
-      const mappedRooms = this.db.prepare('SELECT competitor_hotel_id, competitor_hotel_name, competitor_room_id, competitor_room_name, gross_amount, our_room_type FROM competitor_room_mappings WHERE hotel_id = ?').all(activeHotelId) as CompetitorRoomMapping[];
+      const competitorHotels = this.db.prepare('SELECT competitor_hotel_search, competitor_hotel_id, competitor_hotel_name, url, address, city, currency_code, zip, review_score FROM competitor_hotels WHERE hotel_id = ?').all(activeHotelId) as CompetitorHotel[];
+      const mappedRooms = this.db.prepare('SELECT competitor_hotel_id, competitor_hotel_name, competitor_room_id, competitor_room_name, currency_code, gross_amount, our_room_type FROM competitor_room_mappings WHERE hotel_id = ?').all(activeHotelId) as CompetitorRoomMapping[];
 
       return {
         hotelId: activeHotelId,
@@ -108,8 +108,8 @@ class DatabaseService {
 
       // 4. Insert competitor hotels
       const insertComp = this.db.prepare(`
-        INSERT INTO competitor_hotels (id, hotel_id, competitor_hotel_search, competitor_hotel_id, competitor_hotel_name, address, city, review_score, url)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO competitor_hotels (id, hotel_id, competitor_hotel_search, competitor_hotel_id, competitor_hotel_name, url, address, city, currency_code, zip, review_score)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const c of data.competitorHotels) {
         insertComp.run(
@@ -118,17 +118,19 @@ class DatabaseService {
           c.competitor_hotel_search || '',
           c.competitor_hotel_id,
           c.competitor_hotel_name,
+          c.url || '',
           c.address || '',
           c.city || '',
-          String(c.review_score || ''),
-          c.url || ''
+          c.currency_code || (c.countrycode === 'id' ? 'IDR' : 'MYR'),
+          c.zip || '',
+          String(c.review_score || '')
         );
       }
 
       // 5. Insert mapped rooms
       const insertMapping = this.db.prepare(`
-        INSERT INTO competitor_room_mappings (id, hotel_id, competitor_hotel_id, competitor_hotel_name, competitor_room_id, competitor_room_name, gross_amount, our_room_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO competitor_room_mappings (id, hotel_id, competitor_hotel_id, competitor_hotel_name, competitor_room_id, competitor_room_name, currency_code, gross_amount, our_room_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const m of data.mappedRooms) {
         const grossNum = typeof m.gross_amount === 'number' ? m.gross_amount : parseFloat(String(m.gross_amount || 0)) || null;
@@ -139,6 +141,7 @@ class DatabaseService {
           m.competitor_hotel_name,
           m.competitor_room_id,
           m.competitor_room_name,
+          m.currency_code || m.currency || 'MYR',
           grossNum,
           m.our_room_type || 'UNMAPPED'
         );

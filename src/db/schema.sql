@@ -31,10 +31,12 @@ CREATE TABLE IF NOT EXISTS competitor_hotels (
   competitor_hotel_search TEXT,
   competitor_hotel_id TEXT NOT NULL,
   competitor_hotel_name TEXT NOT NULL,
+  url TEXT,
   address TEXT,
   city TEXT,
+  currency_code TEXT DEFAULT 'MYR',
+  zip TEXT,
   review_score TEXT,
-  url TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (hotel_id) REFERENCES hotels (id) ON DELETE CASCADE
 );
@@ -47,6 +49,7 @@ CREATE TABLE IF NOT EXISTS competitor_room_mappings (
   competitor_hotel_name TEXT NOT NULL,
   competitor_room_id TEXT NOT NULL,
   competitor_room_name TEXT NOT NULL,
+  currency_code TEXT DEFAULT 'MYR',
   gross_amount REAL,
   our_room_type TEXT NOT NULL DEFAULT 'UNMAPPED',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -11,8 +11,11 @@ export interface CompetitorHotel {
   competitor_hotel_name: string;
   address?: string;
   city?: string;
+  countrycode?: string;
+  zip?: string;
   review_score?: string | number;
   url?: string;
+  currency_code?: string;
 }
 
 export interface CompetitorRoomMapping {
@@ -20,8 +23,12 @@ export interface CompetitorRoomMapping {
   competitor_hotel_name: string;
   competitor_room_id: string;
   competitor_room_name: string;
+  currency_code?: string;
   gross_amount?: number | string | null;
   our_room_type: string; // mapped room_type from hotel_data or 'UNMAPPED'
+  countrycode?: string;
+  currency?: string;
+  extracted_at?: string;
 }
 
 export interface PriceReportRow {
@@ -48,4 +55,5 @@ export interface ExtractionResult {
   outputWorkbookName: string;
   priceReport: PriceReportRow[];
   updatedRooms: CompetitorRoomMapping[];
+  competitorHotels?: CompetitorHotel[];
 }

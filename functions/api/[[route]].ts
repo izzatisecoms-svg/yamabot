@@ -75,8 +75,8 @@ export const onRequest = async (context: { request: any; env: Env; next?: () => 
 
       const activeHotelId = hotelRow.id;
       const hotelRooms = await env.DB.prepare('SELECT room_type, room_name, min_rate, max_rate FROM hotel_rooms WHERE hotel_id = ?').bind(activeHotelId).all();
-      const competitorHotels = await env.DB.prepare('SELECT competitor_hotel_search, competitor_hotel_id, competitor_hotel_name, address, city, review_score, url FROM competitor_hotels WHERE hotel_id = ?').bind(activeHotelId).all();
-      const mappedRooms = await env.DB.prepare('SELECT competitor_hotel_id, competitor_hotel_name, competitor_room_id, competitor_room_name, gross_amount, our_room_type FROM competitor_room_mappings WHERE hotel_id = ?').bind(activeHotelId).all();
+      const competitorHotels = await env.DB.prepare('SELECT competitor_hotel_search, competitor_hotel_id, competitor_hotel_name, url, address, city, currency_code, zip, review_score FROM competitor_hotels WHERE hotel_id = ?').bind(activeHotelId).all();
+      const mappedRooms = await env.DB.prepare('SELECT competitor_hotel_id, competitor_hotel_name, competitor_room_id, competitor_room_name, currency_code, gross_amount, our_room_type FROM competitor_room_mappings WHERE hotel_id = ?').bind(activeHotelId).all();
 
       return new Response(JSON.stringify({
         setup: {
@@ -117,18 +117,20 @@ export const onRequest = async (context: { request: any; env: Env; next?: () => 
       for (const c of data.competitorHotels || []) {
         batchStatements.push(
           env.DB.prepare(`
-            INSERT INTO competitor_hotels (id, hotel_id, competitor_hotel_search, competitor_hotel_id, competitor_hotel_name, address, city, review_score, url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO competitor_hotels (id, hotel_id, competitor_hotel_search, competitor_hotel_id, competitor_hotel_name, url, address, city, currency_code, zip, review_score)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).bind(
             'comp_' + Math.random().toString(36).slice(2, 9),
             hotelId,
             c.competitor_hotel_search || '',
             c.competitor_hotel_id,
             c.competitor_hotel_name,
+            c.url || '',
             c.address || '',
             c.city || '',
-            String(c.review_score || ''),
-            c.url || ''
+            c.currency_code || (c.countrycode === 'id' ? 'IDR' : 'MYR'),
+            c.zip || '',
+            String(c.review_score || '')
           )
         );
       }
@@ -137,8 +139,8 @@ export const onRequest = async (context: { request: any; env: Env; next?: () => 
         const grossNum = typeof m.gross_amount === 'number' ? m.gross_amount : parseFloat(String(m.gross_amount || 0)) || null;
         batchStatements.push(
           env.DB.prepare(`
-            INSERT INTO competitor_room_mappings (id, hotel_id, competitor_hotel_id, competitor_hotel_name, competitor_room_id, competitor_room_name, gross_amount, our_room_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO competitor_room_mappings (id, hotel_id, competitor_hotel_id, competitor_hotel_name, competitor_room_id, competitor_room_name, currency_code, gross_amount, our_room_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).bind(
             'crm_' + Math.random().toString(36).slice(2, 9),
             hotelId,
@@ -146,6 +148,7 @@ export const onRequest = async (context: { request: any; env: Env; next?: () => 
             m.competitor_hotel_name,
             m.competitor_room_id,
             m.competitor_room_name,
+            m.currency_code || m.currency || 'MYR',
             grossNum,
             m.our_room_type || 'UNMAPPED'
           )

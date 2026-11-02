@@ -11,11 +11,38 @@ export const DEFAULT_HOTEL_ROOMS: HotelRoomType[] = [
 
 export const DEFAULT_COMPETITOR_HOTELS: CompetitorHotel[] = [
   {
+    competitor_hotel_search: "Hotel Centum Klang",
+    competitor_hotel_id: "449869",
+    competitor_hotel_name: "Hotel Centum",
+    address: "76, Jalan Batu Unjur 1, Taman Bayu Perdana",
+    city: "Klang",
+    zip: "41200",
+    currency_code: "MYR",
+    countrycode: "my",
+    review_score: 8.1,
+    url: "https://www.booking.com/hotel/my/centum.html"
+  },
+  {
+    competitor_hotel_search: "Dolphin Hotel Klang",
+    competitor_hotel_id: "605973",
+    competitor_hotel_name: "Dolphin Hotel",
+    address: "19, Jalan Tiara 2A, Bandar Baru Klang",
+    city: "Klang",
+    zip: "41150",
+    currency_code: "MYR",
+    countrycode: "my",
+    review_score: 7.7,
+    url: "https://www.booking.com/hotel/my/dolphin.html"
+  },
+  {
     competitor_hotel_search: "Premiere Hotel Klang",
     competitor_hotel_id: "104258",
     competitor_hotel_name: "Premiere Hotel Klang",
     address: "Bandar Bukit Tinggi 1/KS6, Jalan Langat",
     city: "Klang, Selangor",
+    zip: "41200",
+    currency_code: "MYR",
+    countrycode: "my",
     review_score: 8.2,
     url: "https://www.booking.com/hotel/my/premiere.html"
   },
@@ -25,6 +52,9 @@ export const DEFAULT_COMPETITOR_HOTELS: CompetitorHotel[] = [
     competitor_hotel_name: "Crystal Crown Hotel Harbour View",
     address: "217 Persiaran Raja Muda Musa",
     city: "Port Klang, Selangor",
+    zip: "42000",
+    currency_code: "MYR",
+    countrycode: "my",
     review_score: 7.6,
     url: "https://www.booking.com/hotel/my/crystal-crown-harbour-view.html"
   },
@@ -34,6 +64,9 @@ export const DEFAULT_COMPETITOR_HOTELS: CompetitorHotel[] = [
     competitor_hotel_name: "Merrida Hotel Klang",
     address: "18R Lebuh Enggang, Off Jalan Meru",
     city: "Klang, Selangor",
+    zip: "41050",
+    currency_code: "MYR",
+    countrycode: "my",
     review_score: 7.9,
     url: "https://www.booking.com/hotel/my/merrida.html"
   },
@@ -43,6 +76,9 @@ export const DEFAULT_COMPETITOR_HOTELS: CompetitorHotel[] = [
     competitor_hotel_name: "Wyndham Acmar Klang",
     address: "1 Persiaran Bukit Raja 1/KU1",
     city: "Klang, Selangor",
+    zip: "41150",
+    currency_code: "MYR",
+    countrycode: "my",
     review_score: 8.7,
     url: "https://www.booking.com/hotel/my/wyndham-acmar.html"
   },
@@ -52,6 +88,9 @@ export const DEFAULT_COMPETITOR_HOTELS: CompetitorHotel[] = [
     competitor_hotel_name: "Klang Histana Hotel",
     address: "Jalan Batu Tiga Lama",
     city: "Klang, Selangor",
+    zip: "41300",
+    currency_code: "MYR",
+    countrycode: "my",
     review_score: 7.4,
     url: "https://www.booking.com/hotel/my/klang-histana.html"
   },
@@ -61,6 +100,9 @@ export const DEFAULT_COMPETITOR_HOTELS: CompetitorHotel[] = [
     competitor_hotel_name: "GM City Hotel Klang",
     address: "Jalan Kasuarina 1, Bandar Botanic",
     city: "Klang, Selangor",
+    zip: "41200",
+    currency_code: "MYR",
+    countrycode: "my",
     review_score: 7.8,
     url: "https://www.booking.com/hotel/my/gm-city.html"
   }
@@ -214,4 +256,8 @@ export const DEFAULT_MAPPED_ROOMS: CompetitorRoomMapping[] = [
     gross_amount: 92.00,
     our_room_type: "Superior Twin"
   }
-];
+].map(r => ({
+  ...r,
+  currency_code: 'MYR',
+  extracted_at: '2026-10-30 09:00:00'
+}));

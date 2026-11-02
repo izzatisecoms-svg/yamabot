@@ -93,8 +93,9 @@ export default function App() {
       const hasMissingRooms = finalRooms.length === 0 || finalHotels.some(
         h => !h.competitor_hotel_id || !finalRooms.some(r => r.competitor_hotel_id === h.competitor_hotel_id)
       );
+      const hasMissingDetails = finalHotels.some(h => !h.address || !h.city || !h.url || !h.zip);
 
-      if (finalHotels.length > 0 && (hasSearchQueries || hasMissingRooms)) {
+      if (finalHotels.length > 0 && (hasSearchQueries || hasMissingRooms || hasMissingDetails)) {
         const { RapidApiService } = await import('./services/rapidApiService');
         const defaultArr = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
         const defaultDep = new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10);
@@ -123,6 +124,10 @@ export default function App() {
         }
         finalRooms = genRooms;
       }
+
+      // Ensure every competitor hotel is fully enriched with url, address, city, and zip
+      const { ExcelService } = await import('./services/excelService');
+      finalHotels = finalHotels.map(h => ExcelService.enrichCompetitorHotel(h));
 
       setCompetitorHotels(finalHotels);
       setMappedRooms(finalRooms);
@@ -194,6 +199,7 @@ export default function App() {
           <Flow2Extraction
             hotelName={hotelName}
             hotelRooms={hotelRooms}
+            competitorHotels={competitorHotels}
             mappedRooms={mappedRooms}
             rapidApiKey={rapidApiKey}
             rapidApiHost={rapidApiHost}

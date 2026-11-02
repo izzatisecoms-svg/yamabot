@@ -206,7 +206,8 @@ export const Flow1Mapping: React.FC<Flow1MappingProps> = ({
       discoveryArrival,
       discoveryDeparture,
       rapidApiKey,
-      rapidApiHost
+      rapidApiHost,
+      hotel.currency_code || hotel.countrycode
     );
 
     const mergedHotel: CompetitorHotel = {
@@ -215,23 +216,28 @@ export const Flow1Mapping: React.FC<Flow1MappingProps> = ({
       competitor_hotel_name: details.competitor_hotel_name || hotel.competitor_hotel_name
     };
 
-    // Step 4: GET Get Room List
+    // Step 4: GET Get Room List (automatically selects IDR/indonesia if countrycode is id/idr, otherwise MYR/MY)
     const rooms = await RapidApiService.getRoomList(
       hotel.competitor_hotel_id,
       discoveryArrival,
       discoveryDeparture,
       rapidApiKey,
-      rapidApiHost
+      rapidApiHost,
+      mergedHotel.countrycode || mergedHotel.currency_code || 'MY'
     );
 
-    // Map to competitor_room structure
+    const nowTimestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const newMappings: CompetitorRoomMapping[] = rooms.map(r => ({
       competitor_hotel_id: hotel.competitor_hotel_id,
       competitor_hotel_name: mergedHotel.competitor_hotel_name,
       competitor_room_id: r.competitor_room_id,
       competitor_room_name: r.room_name,
+      currency_code: r.currency_code || mergedHotel.currency_code || (mergedHotel.countrycode?.toLowerCase() === 'id' ? 'IDR' : 'MYR'),
       gross_amount: r.gross_amount,
-      our_room_type: matchRoomType(r.room_name)
+      our_room_type: matchRoomType(r.room_name),
+      countrycode: mergedHotel.countrycode,
+      currency: r.currency_code || mergedHotel.currency_code || (mergedHotel.countrycode?.toLowerCase() === 'id' ? 'IDR' : 'MYR'),
+      extracted_at: nowTimestamp
     }));
 
     // Update mappedRooms: replace existing records for this hotel with freshly fetched ones
@@ -996,12 +1002,13 @@ export const Flow1Mapping: React.FC<Flow1MappingProps> = ({
                 <th className="py-2.5 px-3 text-right">Sample Rate</th>
                 <th className="py-2.5 px-3">Our Room Type (hotel_data)</th>
                 <th className="py-2.5 px-3 text-center">Status</th>
+                <th className="py-2.5 px-3 text-center font-mono">Extracted At</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredMappedRooms.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400">
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
                     {competitorHotels.length === 0 ? (
                       <div>No competitor hotels added yet. Find hotels above to start discovery.</div>
                     ) : mappedRooms.length === 0 ? (
@@ -1046,7 +1053,9 @@ export const Flow1Mapping: React.FC<Flow1MappingProps> = ({
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-700 tabular-nums">
                         {typeof mapping.gross_amount === 'number' && mapping.gross_amount > 0 ? (
-                          `RM ${mapping.gross_amount.toFixed(2)}`
+                          (mapping.currency_code === 'IDR' || mapping.currency === 'IDR' || mapping.countrycode === 'id')
+                            ? `Rp ${mapping.gross_amount.toLocaleString()}`
+                            : `RM ${mapping.gross_amount.toFixed(2)}`
                         ) : (
                           <span className="text-slate-400">N/A</span>
                         )}
@@ -1091,6 +1100,15 @@ export const Flow1Mapping: React.FC<Flow1MappingProps> = ({
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                             Pending
                           </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                        {mapping.extracted_at ? (
+                          <span className="inline-flex items-center gap-1 bg-slate-50 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
+                            {mapping.extracted_at}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">—</span>
                         )}
                       </td>
                     </tr>

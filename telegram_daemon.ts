@@ -184,6 +184,7 @@ async function handleDocumentUpload(chatId: number | string, message: any) {
     const parsed = ExcelService.parseWorkbookFromBuffer(buffer);
     const hotelName = parsed.hotelName || 'Hotel';
     const hotelRooms = parsed.hotelRooms || [];
+    const competitorHotels = parsed.competitorHotels || [];
     const mappedRooms = parsed.mappedRooms || [];
 
     const activeRooms: CompetitorRoomMapping[] = mappedRooms.filter(
@@ -225,7 +226,9 @@ async function handleDocumentUpload(chatId: number | string, message: any) {
     const outputBuffer = ExcelService.generateOutputWorkbookBuffer(
       hotelName,
       priceReport,
-      updatedRooms
+      updatedRooms,
+      hotelRooms,
+      competitorHotels
     );
 
     const datePrefix = new Date().toISOString().slice(0, 10);

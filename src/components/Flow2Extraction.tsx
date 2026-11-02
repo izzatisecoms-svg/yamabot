@@ -17,7 +17,7 @@ import {
   FileText,
   Database
 } from 'lucide-react';
-import { HotelRoomType, CompetitorRoomMapping, PriceReportRow, ExtractionResult } from '../types/yama';
+import { HotelRoomType, CompetitorHotel, CompetitorRoomMapping, PriceReportRow, ExtractionResult } from '../types/yama';
 import { RapidApiService } from '../services/rapidApiService';
 import { ExcelService } from '../services/excelService';
 import { TelegramService } from '../services/telegramService';
@@ -26,6 +26,7 @@ import { DbClientService } from '../services/dbClientService';
 interface Flow2ExtractionProps {
   hotelName: string;
   hotelRooms: HotelRoomType[];
+  competitorHotels: CompetitorHotel[];
   mappedRooms: CompetitorRoomMapping[];
   rapidApiKey: string;
   rapidApiHost: string;
@@ -50,6 +51,7 @@ interface Flow2ExtractionProps {
 export const Flow2Extraction: React.FC<Flow2ExtractionProps> = ({
   hotelName,
   hotelRooms,
+  competitorHotels,
   mappedRooms,
   rapidApiKey,
   rapidApiHost,
@@ -77,7 +79,7 @@ export const Flow2Extraction: React.FC<Flow2ExtractionProps> = ({
   const [statusMessage, setStatusMessage] = useState('');
   const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null);
 
-  const [outputSheetTab, setOutputSheetTab] = useState<'competitor_price' | 'competitor_room'>('competitor_price');
+  const [outputSheetTab, setOutputSheetTab] = useState<'competitor_price' | 'competitor_room' | 'competitor_hotel'>('competitor_price');
   const [sendingTelegram, setSendingTelegram] = useState(false);
   const [telegramStatus, setTelegramStatus] = useState<string | null>(null);
 
@@ -140,7 +142,8 @@ export const Flow2Extraction: React.FC<Flow2ExtractionProps> = ({
         hotelName,
         outputWorkbookName: `${datePrefix}-${hotelName}.xlsx`,
         priceReport,
-        updatedRooms
+        updatedRooms,
+        competitorHotels
       };
 
       setExtractionResult(result);
@@ -165,7 +168,9 @@ export const Flow2Extraction: React.FC<Flow2ExtractionProps> = ({
       extractionResult.departureDate,
       extractionResult.priceReport,
       extractionResult.updatedRooms,
-      true // Download to PC only when explicitly requested
+      true, // Download to PC only when explicitly requested
+      hotelRooms,
+      extractionResult.competitorHotels || competitorHotels
     );
   };
 
@@ -186,7 +191,9 @@ export const Flow2Extraction: React.FC<Flow2ExtractionProps> = ({
         extractionResult.departureDate,
         extractionResult.priceReport,
         extractionResult.updatedRooms,
-        false
+        false,
+        hotelRooms,
+        extractionResult.competitorHotels || competitorHotels
       );
 
       const lines = [
@@ -602,14 +609,14 @@ export const Flow2Extraction: React.FC<Flow2ExtractionProps> = ({
             <div className="px-5 py-3 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
               <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
                 <button
-                  onClick={() => setOutputSheetTab('competitor_price')}
+                  onClick={() => setOutputSheetTab('competitor_hotel')}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                    outputSheetTab === 'competitor_price'
+                    outputSheetTab === 'competitor_hotel'
                       ? 'bg-white text-slate-900 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Sheet: competitor_price
+                  Sheet: competitor_hotel
                 </button>
                 <button
                   onClick={() => setOutputSheetTab('competitor_room')}
@@ -620,6 +627,16 @@ export const Flow2Extraction: React.FC<Flow2ExtractionProps> = ({
                   }`}
                 >
                   Sheet: competitor_room
+                </button>
+                <button
+                  onClick={() => setOutputSheetTab('competitor_price')}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                    outputSheetTab === 'competitor_price'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Sheet: competitor_price
                 </button>
               </div>
 
@@ -632,93 +649,218 @@ export const Flow2Extraction: React.FC<Flow2ExtractionProps> = ({
               </button>
             </div>
 
-            {/* competitor_price Sheet */}
-            {outputSheetTab === 'competitor_price' && (
-              <div className="p-5">
-                <div className="mb-3">
-                  <h4 className="font-semibold text-slate-900 text-xs">
-                    Market Price Summary Report
-                  </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Averages and valid minimums are calculated excluding missing rates (N/A is never treated as 0).
-                  </p>
-                </div>
+            {/* competitor_price Sheet - Exact format matching image_93bc1049.png */}
+            {outputSheetTab === 'competitor_price' && (() => {
+              // Extract room types preserving configured order
+              const displayRoomTypes: string[] = hotelRooms.length > 0
+                ? hotelRooms.map(r => r.room_type)
+                : extractionResult.priceReport.map(p => p.our_room_type);
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
-                        <th className="py-2.5 px-3">Our Room Type</th>
-                        <th className="py-2.5 px-3">Min Limit</th>
-                        <th className="py-2.5 px-3">Max Limit</th>
-                        <th className="py-2.5 px-3 font-semibold text-slate-900">Lowest Rate</th>
-                        <th className="py-2.5 px-3 font-semibold text-slate-900">Average Rate</th>
-                        <th className="py-2.5 px-3 text-center">Quotes</th>
-                        <th className="py-2.5 px-3">Pricing Recommendation</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {extractionResult.priceReport.map((p, idx) => (
-                        <tr key={`price_report_row_${p.our_room_type}_${idx}`} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="py-2.5 px-3 font-medium text-slate-900">
-                            {p.our_room_type}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono text-slate-600 tabular-nums">
-                            RM {p.our_min_rate}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono text-slate-600 tabular-nums">
-                            RM {p.our_max_rate}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono font-semibold text-slate-900 tabular-nums">
-                            {typeof p.lowest_competitor_price === 'number' ? `RM ${p.lowest_competitor_price.toFixed(2)}` : 'N/A'}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono font-semibold text-slate-900 tabular-nums">
-                            {typeof p.average_competitor_price === 'number' ? `RM ${p.average_competitor_price.toFixed(2)}` : 'N/A'}
-                          </td>
-                          <td className="py-2.5 px-3 text-center font-mono text-slate-600">
-                            {p.valid_quotes}
-                          </td>
-                          <td className="py-2.5 px-3 text-slate-700">
-                            {p.recommendation}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              // Distinct competitor hotels
+              const compHotelMap = new Map<string, { id: string; name: string }>();
+              (competitorHotels || []).forEach(h => {
+                const id = String(h.competitor_hotel_id || '').trim();
+                const name = h.competitor_hotel_name || h.competitor_hotel_search || `Hotel ${id}`;
+                if (id && !compHotelMap.has(id)) {
+                  compHotelMap.set(id, { id, name });
+                }
+              });
+              (extractionResult.updatedRooms || []).forEach(r => {
+                const id = String(r.competitor_hotel_id || '').trim();
+                const name = r.competitor_hotel_name || `Hotel ${id}`;
+                if (id && !compHotelMap.has(id)) {
+                  compHotelMap.set(id, { id, name });
+                }
+              });
+              const competitorList = Array.from(compHotelMap.values());
 
-                {/* Sub-breakdown per competitor */}
-                <div className="mt-5 pt-4 border-t border-slate-100">
-                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5">
-                    Rate Breakdown by Competitor Hotel
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {extractionResult.priceReport.map((p, idx) => (
-                      <div key={`breakdown_card_${p.our_room_type}_${idx}`} className="p-3 rounded-lg border border-slate-200 bg-slate-50/40 text-xs">
-                        <div className="font-semibold text-slate-900 flex justify-between mb-2">
-                          <span>{p.our_room_type}</span>
-                          <span className="font-normal text-slate-500">
-                            Avg: {typeof p.average_competitor_price === 'number' ? `RM ${p.average_competitor_price}` : 'N/A'}
-                          </span>
-                        </div>
-                        <div className="space-y-1">
-                          {p.competitor_breakdown.map((cb, cIdx) => (
-                            <div key={`comp_item_${idx}_${cIdx}_${cb.hotel_name}_${cb.room_name}`} className="flex justify-between items-center bg-white p-2 rounded border border-slate-200 text-[11px]">
-                              <span className="text-slate-700 truncate pr-2">
-                                <strong>{cb.hotel_name}</strong> ({cb.room_name})
-                              </span>
-                              <span className="font-mono font-medium text-slate-900 shrink-0">
-                                {typeof cb.price === 'number' ? `RM ${cb.price}` : <span className="text-slate-400">N/A</span>}
-                              </span>
-                            </div>
+              const sampleCurr = extractionResult.updatedRooms.find(r => r.currency_code || r.currency)?.currency_code ||
+                extractionResult.updatedRooms.find(r => r.currency_code || r.currency)?.currency ||
+                'MYR';
+              const isIdr = String(sampleCurr).toUpperCase() === 'IDR';
+              const currSymbol = isIdr ? 'Rp ' : (String(sampleCurr).toUpperCase() === 'USD' ? '$' : 'RM ');
+              const currLabel = isIdr ? 'IDR' : (String(sampleCurr).toUpperCase() === 'MYR' ? 'RM' : sampleCurr);
+
+              const formatCellRate = (val: number | null | undefined) => {
+                if (val === null || val === undefined || isNaN(val) || val <= 0) return 'N/A';
+                return `${currSymbol}${val.toFixed(2)}`;
+              };
+
+              return (
+                <div className="p-4 sm:p-6 bg-slate-900/5 space-y-4">
+                  {/* Outer Excel-Style Container */}
+                  <div className="rounded-xl overflow-hidden border border-slate-300 shadow-md bg-white">
+                    {/* Navy Title Banner matching Image 93bc1049 */}
+                    <div className="bg-[#0b2545] text-white px-5 py-3.5 border-b border-[#133660] flex items-center justify-between">
+                      <h2 className="text-sm sm:text-base font-bold tracking-wide uppercase font-mono">
+                        COMPETITOR PRICE REPORT | {hotelName || "Hotel Pricing Monitor"}
+                      </h2>
+                      <span className="text-[11px] font-mono px-2.5 py-0.5 rounded bg-blue-900/80 text-blue-200 border border-blue-700">
+                        Sheet: competitor_price
+                      </span>
+                    </div>
+
+                    {/* SECTION 1: ROOM RATE SUMMARY */}
+                    <div className="bg-[#13335a] text-white px-4 py-2 text-xs font-bold tracking-wide uppercase border-b border-[#1d4474]">
+                      ROOM RATE SUMMARY | Quick pricing overview
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-[#193d6a] text-white font-semibold border-b border-[#244f84]">
+                            <th className="py-2.5 px-3 min-w-[120px]">Metric</th>
+                            <th className="py-2.5 px-3 min-w-[180px]">Description</th>
+                            {displayRoomTypes.map(rt => (
+                              <th key={`summary_hdr_${rt}`} className="py-2.5 px-3 text-center min-w-[90px] font-mono font-bold">
+                                {rt}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 text-slate-800">
+                          {/* Row 1: Average */}
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-semibold text-slate-900">Average</td>
+                            <td className="py-2.5 px-3 text-slate-600">Valid competitor rates only</td>
+                            {displayRoomTypes.map(rt => {
+                              const report = extractionResult.priceReport.find(p => p.our_room_type.toUpperCase() === rt.toUpperCase());
+                              const val = typeof report?.average_competitor_price === 'number' ? report.average_competitor_price : null;
+                              return (
+                                <td key={`avg_${rt}`} className="py-2.5 px-3 text-center font-mono font-bold bg-[#d1fae5]/80 text-[#065f46] border-l border-slate-200">
+                                  {formatCellRate(val)}
+                                </td>
+                              );
+                            })}
+                          </tr>
+
+                          {/* Row 2: Lowest */}
+                          <tr className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-semibold text-slate-900">Lowest</td>
+                            <td className="py-2.5 px-3 text-slate-600">Lowest valid rate</td>
+                            {displayRoomTypes.map(rt => {
+                              const report = extractionResult.priceReport.find(p => p.our_room_type.toUpperCase() === rt.toUpperCase());
+                              const val = typeof report?.lowest_competitor_price === 'number' ? report.lowest_competitor_price : null;
+                              return (
+                                <td key={`lowest_${rt}`} className="py-2.5 px-3 text-center font-mono font-bold bg-[#d1fae5]/80 text-[#065f46] border-l border-slate-200">
+                                  {formatCellRate(val)}
+                                </td>
+                              );
+                            })}
+                          </tr>
+
+                          {/* Row 3: Allowed range */}
+                          <tr className="hover:bg-slate-50/50 bg-white">
+                            <td className="py-2.5 px-3 font-semibold text-slate-900">Allowed range</td>
+                            <td className="py-2.5 px-3 text-slate-600">Min–max configured</td>
+                            {displayRoomTypes.map(rt => {
+                              const cfg = hotelRooms.find(r => r.room_type.toUpperCase() === rt.toUpperCase());
+                              const report = extractionResult.priceReport.find(p => p.our_room_type.toUpperCase() === rt.toUpperCase());
+                              const min = cfg?.min_rate ?? report?.our_min_rate;
+                              const max = cfg?.max_rate ?? report?.our_max_rate;
+                              const rangeStr = (min !== undefined && max !== undefined && (min > 0 || max > 0))
+                                ? `${min}–${max}`
+                                : 'N/A';
+                              return (
+                                <td key={`range_${rt}`} className="py-2.5 px-3 text-center font-mono text-slate-700 border-l border-slate-200">
+                                  {rangeStr}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* SECTION 2: COMPETITOR PRICE COMPARISON */}
+                    <div className="bg-[#13335a] text-white px-4 py-2 text-xs font-bold tracking-wide uppercase border-t-2 border-b border-[#1d4474] mt-2">
+                      COMPETITOR PRICE COMPARISON | Room rates ({currLabel})
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-[#193d6a] text-white font-semibold border-b border-[#244f84]">
+                            <th className="py-2.5 px-3 min-w-[140px]">Competitor hotel</th>
+                            <th className="py-2.5 px-3 min-w-[120px] font-mono">Hotel ID</th>
+                            {displayRoomTypes.map(rt => (
+                              <th key={`comp_hdr_${rt}`} className="py-2.5 px-3 text-center min-w-[90px] font-mono font-bold">
+                                {rt}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 text-slate-800 bg-white">
+                          {competitorList.map(h => (
+                            <tr key={`matrix_hotel_${h.id}`} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-2.5 px-3 font-medium text-slate-900">
+                                {h.name}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-slate-500">
+                                {h.id}
+                              </td>
+                              {displayRoomTypes.map(rt => {
+                                const matchingRooms = (extractionResult.updatedRooms || []).filter(r =>
+                                  String(r.competitor_hotel_id).trim() === String(h.id).trim() &&
+                                  String(r.our_room_type || '').trim().toUpperCase() === rt.toUpperCase()
+                                );
+
+                                const prices: number[] = [];
+                                matchingRooms.forEach(m => {
+                                  if (typeof m.gross_amount === 'number' && !isNaN(m.gross_amount) && m.gross_amount > 0) {
+                                    prices.push(m.gross_amount);
+                                  } else if (m.gross_amount && m.gross_amount !== 'N/A') {
+                                    const parsed = Number(m.gross_amount);
+                                    if (!isNaN(parsed) && parsed > 0) prices.push(parsed);
+                                  }
+                                });
+
+                                const hasValidPrice = prices.length > 0;
+                                const minRate = hasValidPrice ? Math.min(...prices) : null;
+
+                                return (
+                                  <td
+                                    key={`cell_${h.id}_${rt}`}
+                                    className={`py-2.5 px-3 text-center font-mono border-l border-slate-100 ${
+                                      hasValidPrice ? 'font-semibold text-slate-900' : 'text-slate-400'
+                                    }`}
+                                  >
+                                    {formatCellRate(minRate)}
+                                  </td>
+                                );
+                              })}
+                            </tr>
                           ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Pricing Recommendations Card Below Sheet Matrix */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+                    <div className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-2 flex items-center justify-between">
+                      <span>Dynamic Pricing Recommendations</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Based on competitor market floor rates</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
+                      {extractionResult.priceReport.map(p => (
+                        <div key={`rec_${p.our_room_type}`} className="p-2.5 rounded-lg border border-slate-200/80 bg-slate-50/50 flex flex-col justify-between">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-bold text-slate-900">{p.our_room_type}</span>
+                            <span className="text-[11px] font-mono text-slate-500">
+                              Floor: {typeof p.lowest_competitor_price === 'number' ? `RM ${p.lowest_competitor_price.toFixed(2)}` : 'N/A'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            {p.recommendation}
+                          </p>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* competitor_room Sheet */}
             {outputSheetTab === 'competitor_room' && (
@@ -742,6 +884,7 @@ export const Flow2Extraction: React.FC<Flow2ExtractionProps> = ({
                         <th className="py-2.5 px-3">Competitor Room Name</th>
                         <th className="py-2.5 px-3 font-semibold text-slate-900">Latest gross_amount</th>
                         <th className="py-2.5 px-3">Our Room Type</th>
+                        <th className="py-2.5 px-3 text-center font-mono">Extracted At</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -760,13 +903,89 @@ export const Flow2Extraction: React.FC<Flow2ExtractionProps> = ({
                             {room.competitor_room_name}
                           </td>
                           <td className="py-2.5 px-3 font-mono font-semibold text-slate-900 tabular-nums">
-                            {typeof room.gross_amount === 'number' ? `RM ${room.gross_amount.toFixed(2)}` : <span className="text-slate-400">N/A</span>}
+                            {typeof room.gross_amount === 'number' ? (
+                              (room.currency_code === 'IDR' || room.currency === 'IDR' || room.countrycode === 'id')
+                                ? `Rp ${room.gross_amount.toLocaleString()}`
+                                : `RM ${room.gross_amount.toFixed(2)}`
+                            ) : <span className="text-slate-400">N/A</span>}
                           </td>
                           <td className="py-2.5 px-3 text-slate-900 font-medium">
                             {room.our_room_type}
                           </td>
+                          <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 bg-slate-50 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
+                              {room.extracted_at || extractionResult.runDate}
+                            </span>
+                          </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* competitor_hotel Sheet */}
+            {outputSheetTab === 'competitor_hotel' && (
+              <div className="p-5">
+                <div className="mb-3">
+                  <h4 className="font-semibold text-slate-900 text-xs">
+                    competitor_hotel Sheet (Hotel Metadata &amp; Location)
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Exact 8 columns: competitor_hotel_search | competitor_hotel_id | competitor_hotel_name | url | address | city | currency_code | zip
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
+                        <th className="py-2.5 px-3">competitor_hotel_search</th>
+                        <th className="py-2.5 px-3">competitor_hotel_id</th>
+                        <th className="py-2.5 px-3">competitor_hotel_name</th>
+                        <th className="py-2.5 px-3">url</th>
+                        <th className="py-2.5 px-3">address</th>
+                        <th className="py-2.5 px-3">city</th>
+                        <th className="py-2.5 px-3">currency_code</th>
+                        <th className="py-2.5 px-3">zip</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {((extractionResult.competitorHotels && extractionResult.competitorHotels.length > 0) ? extractionResult.competitorHotels : competitorHotels).map((rawH, idx) => {
+                        const h = ExcelService.enrichCompetitorHotel(rawH);
+                        return (
+                          <tr key={`comp_hotel_row_${h.competitor_hotel_id}_${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-2.5 px-3 font-medium text-slate-900">
+                              {h.competitor_hotel_search || h.competitor_hotel_name}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-slate-500">
+                              {h.competitor_hotel_id}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-800">
+                              {h.competitor_hotel_name}
+                            </td>
+                            <td className="py-2.5 px-3 text-blue-600 max-w-[200px] truncate">
+                              <a href={h.url} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
+                                <span className="truncate">{h.url}</span>
+                                <ExternalLink className="w-3 h-3 shrink-0" />
+                              </a>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600">
+                              {h.address || '—'}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 font-medium">
+                              {h.city || '—'}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-slate-700">
+                              {h.currency_code || 'MYR'}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-slate-600">
+                              {h.zip || '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

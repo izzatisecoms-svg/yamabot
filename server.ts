@@ -353,6 +353,7 @@ async function runScheduledTask(triggerSource = 'Automated Timer') {
         RAPIDAPI_KEY,
         RAPIDAPI_HOST
       );
+      competitorHotels = resolved.updatedHotels;
       mappedRooms = resolved.generatedRooms;
       activeRooms = mappedRooms.filter(
         r => r.our_room_type && !['UNMAPPED', 'IGNORE', 'NONE', ''].includes(r.our_room_type.toUpperCase())
@@ -392,7 +393,9 @@ async function runScheduledTask(triggerSource = 'Automated Timer') {
     const outputBuffer = ExcelService.generateOutputWorkbookBuffer(
       hotelName,
       priceReport,
-      updatedRooms
+      updatedRooms,
+      hotelRooms,
+      competitorHotels
     );
 
     const datePrefix = new Date().toISOString().slice(0, 10);
@@ -700,7 +703,9 @@ async function handleDocumentUpload(chatId: number | string, message: any) {
     const outputBuffer = ExcelService.generateOutputWorkbookBuffer(
       hotelName,
       priceReport,
-      updatedRooms
+      updatedRooms,
+      hotelRooms,
+      competitorHotels
     );
 
     const datePrefix = new Date().toISOString().slice(0, 10);

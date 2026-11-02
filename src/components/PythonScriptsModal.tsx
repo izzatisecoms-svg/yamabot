@@ -174,8 +174,10 @@ class ExcelEngine:
         }
 
         # 1. Output Sheet: competitor_room
+        from datetime import datetime
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ws_room = wb.create_sheet(title="competitor_room")
-        ws_room.append(["competitor_hotel_id", "competitor_hotel_name", "competitor_room_id", "competitor_room_name", "gross_amount", "our_room_type"])
+        ws_room.append(["hotel_name", "competitor_hotel_name", "competitor_hotel_id", "competitor_room_id", "competitor_room_name", "currency_code", "gross_amount", "room_type", "extracted_at"])
         
         prices_by_type = {}
         for mr in mapped_rooms:
@@ -185,7 +187,9 @@ class ExcelEngine:
             
             is_valid = isinstance(price, (int, float)) and price > 0
             val_str = float(price) if is_valid else "N/A"
-            ws_room.append([h_id, mr.get("competitor_hotel_name", ""), r_id, mr.get("competitor_room_name", ""), val_str, mr["our_room_type"]])
+            curr_code = mr.get("currency_code") or ("IDR" if str(mr.get("countrycode", "")).lower() == "id" else "MYR")
+            extracted_time = mr.get("extracted_at") or now_str
+            ws_room.append([hotel_name, mr.get("competitor_hotel_name", ""), h_id, r_id, mr.get("competitor_room_name", ""), curr_code, val_str, mr.get("our_room_type", "UNMAPPED"), extracted_time])
             
             if is_valid:
                 prices_by_type.setdefault(mr["our_room_type"], []).append(float(price))
@@ -226,15 +230,32 @@ class RapidApiBookingClient:
         res = requests.get(url, headers=self.headers, params={"query": query})
         return res.json().get("data", [])
 
-    def get_room_list(self, hotel_id, arrival_date, departure_date):
+    def get_room_list(self, hotel_id, arrival_date, departure_date, countrycode="my"):
+        # if countrycode = my -> currency_code = MYR, location = MY
+        # if countrycode = id -> currency_code = IDR, location = MY
+        is_id = str(countrycode).lower() in ["id", "idr", "indonesia"]
+        currency = "IDR" if is_id else "MYR"
+        location = "MY"  # Keep location=MY for Indonesia and Malaysia
+
         url = f"https://{self.api_host}/api/v1/hotels/getRoomList"
         res = requests.get(url, headers=self.headers, params={
             "hotel_id": str(hotel_id),
             "arrival_date": arrival_date,
             "departure_date": departure_date,
-            "currency": "MYR"
+            "currency": currency,
+            "location": location
         })
-        return res.json().get("data", {}).get("rooms", [])`
+        data = res.json()
+        if not data.get("status", True) or not (data.get("data", {}).get("block") or data.get("data", {}).get("rooms")):
+            # Auto-retry without location parameter
+            res = requests.get(url, headers=self.headers, params={
+                "hotel_id": str(hotel_id),
+                "arrival_date": arrival_date,
+                "departure_date": departure_date,
+                "currency": currency
+            })
+            data = res.json()
+        return data.get("data", {}).get("block") or data.get("data", {}).get("rooms", [])`
     },
     telegram: {
       name: 'telegram_notifier.py',
