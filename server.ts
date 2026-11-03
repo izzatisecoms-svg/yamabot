@@ -512,7 +512,7 @@ async function sendTelegramMessage(chatId: string | number, text: string, replyT
       body: JSON.stringify(body)
     });
   } catch (e: any) {
-    console.error('Failed to send Telegram message:', e.message);
+    console.warn('Telegram send notice:', e.message);
   }
 }
 
@@ -777,30 +777,65 @@ async function handleDocumentUpload(chatId: number | string, message: any) {
 
 // Background Telegram Poller Loop
 async function startTelegramPoller() {
+  if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN.includes('YOUR_BOT')) {
+    console.log('ℹ️ Telegram bot token not configured; poller standing by.');
+    daemonStatus.status = 'offline';
+    updateHeartbeat();
+    return;
+  }
+
   console.log('🤖 Starting background Telegram Bot Poller for @' + daemonStatus.botUsername);
 
   try {
-    const meRes = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`);
-    const meData = await meRes.json();
-    if (meData.ok && meData.result?.username) {
-      daemonStatus.botUsername = meData.result.username;
-      daemonStatus.status = 'online';
-      updateHeartbeat();
-      console.log(`✅ Telegram bot connected as @${daemonStatus.botUsername}`);
+    const meRes = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`, {
+      signal: AbortSignal.timeout(8000)
+    });
+    if (meRes.ok) {
+      const meData: any = await meRes.json();
+      if (meData.ok && meData.result?.username) {
+        daemonStatus.botUsername = meData.result.username;
+        daemonStatus.status = 'online';
+        updateHeartbeat();
+        console.log(`✅ Telegram bot connected as @${daemonStatus.botUsername}`);
+      }
     }
   } catch (e: any) {
-    console.warn('⚠️ Could not connect to Telegram on startup:', e.message);
+    console.warn('⚠️ Could not connect to Telegram on startup (will retry in background):', e.message);
   }
 
   let offset: number | null = null;
+  let consecutiveErrors = 0;
 
   while (true) {
     try {
-      const fetchUrl: string = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=20${offset ? `&offset=${offset}` : ''}`;
-      const fetchRes = await fetch(fetchUrl);
+      const fetchUrl: string = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=10${offset ? `&offset=${offset}` : ''}`;
+      const fetchRes = await fetch(fetchUrl, {
+        signal: AbortSignal.timeout(16000)
+      });
+
+      if (!fetchRes.ok) {
+        const status = fetchRes.status;
+        if (status === 409) {
+          // Another instance is active or previous connection is still terminating
+          daemonStatus.status = 'busy';
+          updateHeartbeat();
+          await new Promise(r => setTimeout(r, 6000));
+          continue;
+        } else if (status === 401 || status === 404) {
+          daemonStatus.status = 'offline';
+          updateHeartbeat();
+          await new Promise(r => setTimeout(r, 30000));
+          continue;
+        } else {
+          await new Promise(r => setTimeout(r, 5000));
+          continue;
+        }
+      }
+
       const data: any = await fetchRes.json();
 
       if (data.ok && Array.isArray(data.result)) {
+        consecutiveErrors = 0;
         daemonStatus.status = daemonStatus.isProcessing ? 'busy' : 'online';
         updateHeartbeat();
 
@@ -871,10 +906,19 @@ async function startTelegramPoller() {
             await handleDocumentUpload(chatId, msg);
           }
         }
+      } else {
+        const delay = (data.parameters?.retry_after ? data.parameters.retry_after * 1000 : 5000);
+        await new Promise(r => setTimeout(r, delay));
       }
     } catch (e: any) {
-      console.error('Telegram polling error:', e.message);
-      await new Promise(r => setTimeout(r, 4000));
+      consecutiveErrors++;
+      daemonStatus.status = 'offline';
+      updateHeartbeat();
+      const backoffMs = Math.min(3000 + (consecutiveErrors * 1000), 15000);
+      if (consecutiveErrors % 5 === 1) {
+        console.warn(`⚠️ Telegram polling reconnecting (${e.message || 'connection reset'}), retrying in ${Math.round(backoffMs / 1000)}s...`);
+      }
+      await new Promise(r => setTimeout(r, backoffMs));
     }
   }
 }
