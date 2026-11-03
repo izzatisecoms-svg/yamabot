@@ -12,7 +12,7 @@ pages_build_output_dir = "dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "yama_db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "dd043556-d977-4298-9f3d-28359c97ebda"
 
 [vars]
 RAPIDAPI_HOST = "booking-com15.p.rapidapi.com"
